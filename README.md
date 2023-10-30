@@ -1,2 +1,43 @@
-# Quasi-2D-packbed
-Quasi-two-dimensional model of catalytic packed-bed membrane reactors
+# Quasi-two-dimensional (Q2D) packed-bed reactor model
+A Quasi-two-dimensional code for modeling a catalytic packed-bed membrane reactor 
+
+## Installation
+Q2D model can be run by compiling the code on the user’s local machine from the source. 
+All operating parameters needed to run the model are specified in the 'input.dat' file.
+
+#### Installation requirements
+1. Compiled Cantera code (Version 3.0 or more)
+2. Python, Boost, and Sundials - The Q2D PackBed code does not use Python or Sundials explicitly, but Cantera needs this software.
+3. Microsoft Visual Studio (Required on Windows)
+
+#### Compilation on Windows
+1. Open the file 'SConstruct' from the Packbed folder.
+2. Change the directory paths to the local directory paths where Cantera and Boost suites are installed.
+3. Open the MSVC command prompt in the Packbed folder and run 'scons'. The code should compile without any error. 
+4. Run the command 'packbedQ2D.exe' to run the program.
+5. The code can also be run by double-clicking on packbedBVP.exe. 
+
+#### Compilation on Linux
+1. Open the file 'Makefile' from the `code' folder.
+2. Change the directory paths to the local directory paths where Cantera and Boost suites are installed.
+3. Open the terminal in the Packbed folder and run 'make all'. The code should compile without any error. 
+4. Run the command './output' to run the program.
+
+## Input and output files
+1. The Q2D model reads input data from the file 'input.dat'. 
+2. The solution is saved in output files 'molefractions_T_P_V.csv' and 'solution_T_P_V.csv'. 
+3. The file 'molefractions_T_P_V.csv' stores mole fractions of gas-phase species, density, pressure, temperature, and surface coverages.
+   T, P, and V correspond to the inlet temperature, pressure, and velocity(or flow rate).
+4. The file 'solution_T_P_V.csv' stores the variables used in the solution vector 
+   (i.e. mass fractions of gas-phase species, density, pressure, temperature, and surface coverages). 
+5. The XML file starting with "Err_" is saved in case of code failure. It saves the last successful steady-state solution.
+6. The input file (input.dat) contains a parameter called 'RESTART' to specify if the user wants to use the previous solution as the initial guess. 
+7. If RESTART is set to 1, then the model reads the XML file named "savedSoln.xml" as the initial guess. The file "savedSoln" gets saved every time the model is run.
+
+## Citation
+Please cite this package along with the research articles, when used in a scholarly work.
+1. `Computationally efficient and robust models of non-ideal thermodynamics, gas-phase kinetics and heterogeneous catalysis in chemical reactors', G. Kogekar, Doctoral dissertation, 2021
+2. `Quasi-two-dimensional model of catalytic packed-bed membrane reactors', G. Kogekar, H. Zhu, R.J. Kee, In preparation, 2023
+
+## License
+Q2D packed-bed model is released under the MIT license; see LICENSE for details.
