@@ -1,0 +1,119 @@
+// Input file for Packbed model
+
+//REACTOR GEOMETRY
+
+//LUMEN
+POROSITY_LUMEN 		0.6			        // Porosity [] (Lumen)
+TORTUOSITY_LUMEN	2.0			        // Tortuosity [] (Lumen)
+PARTICLEDIA_LUMEN   3.5e-4			        // Particle Diameter [m] (Lumen)
+PORERAD_LUMEN		1e-4			        // Pore radius [m] (Lumen)
+CHANNELRAD_LUMEN	3e-3 			        // Radius of the reactor channel [m] (Lumen)
+SPECIFICAREA_LUMEN  5e5                     // Catalyst specific area [1/m] (Lumen)
+LENGTH_LUMEN       	2e-2                    // Length of the catalyst bed [m] (Lumen)
+MICROPOROSITY_LUMEN 0.5                     // Porosity of micro-pores [] (Lumen)
+MICROPORERAD_LUMEN  1e-5                    // Radius of miccro-pores [m] (Lumen)
+
+//Filename
+GASCTIFILE_LUMEN 	methaneReformingNi.yaml	// Name of the CTI file containing gas phase (Lumen)
+GASPHASE_LUMEN		gas				        // Name of the gas phase in CTI file (Lumen)
+SURFCTIFILE_LUMEN 	methaneReformingNi.yaml	// Name of the CTI file containing surface phase (Lumen)
+SURFPHASE_LUMEN		Ni_surface		        // Name of the surface phase in CTI file (Lumen)
+
+//SUPPORT
+SOLVE_SUPPORT           0                   // Solve trasport inside the support
+POROSITY_SUPPORT 	    0.40			     // Porosity [] (Support)
+TORTUOSITY_SUPPORT	    2.00			     // Tortuosity [] (Support)
+PARTICLEDIA_SUPPORT     3.37e-4			     // Particle Diameter [m] (Support)
+PORERAD_SUPPORT		    1e-4			     // Pore radius [m] (Support)
+CHANNELRAD_SUPPORT	    5e-3 			     // Radius of the reactor channel [m] (Support)
+SPECIFICAREA_SUPPORT    3e5                  // Catalyst specific area [1/m] (Support)
+THICKNESS_SUPPORT      	1.33e-3             // Thickness of the support [m]
+MICROPOROSITY_SUPPORT   0.4                  // Porosity of micro-pores [] (Support)
+MICROPORERAD_SUPPORT    1e-4                 // Radiaus of miccro-pores [m] (Support)
+
+//Filename
+GASCTIFILE_SUPPORT 	    Ammonia-Ni-BaZrO3.yaml	// Name of the CTI file containing gas phase (Support)
+GASPHASE_SUPPORT		gas				        // Name of the gas phase in CTI file (Support)
+SURFCTIFILE_SUPPORT 	Ammonia-Ni-BaZrO3.yaml	// Name of the CTI file containing surface phase (Support)
+SURFPHASE_SUPPORT		Ni_surface		        // Name of the surface phase in CTI file (Support)
+
+//Inlet conditions
+INLETTEMP 	 	1173	 	 	// Inlet temperature [K] 
+OUTLETPRES 	 	10e5     	// Outlet pressure [Pa] 
+SCCM 	 	 	500.00	 	 	// Inlet flow rate in term of [SCCM] 
+//VEL 			0.16736			        // Specify velocity in terms of [m/s]
+
+//Inlet species MASS/MOLE fractions
+SPECIESFRAC     MOLE			        // Specify inlet composition in terms of MOLE/MASS fractions []
+CH4             0.25
+H2O              0.75
+AR              0.00001
+
+//Initial Surface coverages
+Ni(s)           1.0
+
+//Solve energy
+SOLVEENERGY     0
+TWALL           723                    // Wall temperature
+HCOEFF          0                    // Heat transfer coefficient
+
+//Refine mesh
+REFINE          1
+
+//Axial transport
+TRAN_MODEL      FICK                     // Transport using Fickian diffusion (Default)
+MESHPOINTS      20                       // Number of axial mesh points
+RAND_PORE_MODEL 1                        // Include random-pore model
+
+//Radial velocity
+RADIAL_VEL      0                       // Solve radial velocity
+
+//Radial transport
+LUMEN_POINTS     1                       // Number of radial mesh points inside the Lumen
+SUPPORT_POINTS   0                       // Number of radial mesh points inside the Support
+
+// Solid Particle transport
+SOLVE_SOLID     1
+COND_SOLID      12                      // Thermal conductivity of the solid Particle (W/m/K)
+DENSITY_SOLID   3e3                     // Density of the solid Particle
+CP_SOLID        451                     // Specific heat of the solid particle (J/kg/K)
+EMISSIVITY      0.9                     // Emissivity
+T_ENV           273                     // Environmental temperature
+A_ENV           3e2                     // Interface area of the porous media with surroundings
+
+//Parameters to solve membrane fluxes 
+MEMSOLVE 		1				        // Include membrane flux [yes/no]
+MEMSPNAME 		H2				        // Membrane-permeable species name
+MEMTHICKNESS	5E-6			        // Thickness of the membrane [m]
+Ea_R 			1641.0324		        // Ratio Ea/R for the membrane material [K]
+k0 				3.8913E-14  	        // Permeability constant
+SWEEPPRES		1e5				        // Sweep side pressure [Pa]
+
+//Solver Tolerances
+ATOL_SS         1e-14                   // Absolute tolerance for steady solver
+RTOL_SS         1e-04                   // Relative tolerance for steady solver
+ATOL_TS         1e-14                   // Absolute tolerance for transient solver
+RTOL_TS         1e-03                   // Relative tolerance for transient solver
+LOGLEVEL        1                       // Loglevel 
+MAXGRIDPOINTS   1000                    // Maximum allowed grid points
+MAXTIMESTEPS    500                     // Maximum number of time-steps allowed before successful steady-state solve
+MINTIMESTEPS    10                      // Minimum number of time-steps allowed before successful steady-state solve
+MINTIMESTEPSIZE 1e-05                   // Minimum time-step size
+MAXTIMESTEPSIZE 1e08                    // Maximum time-step size
+
+//Grid Refining
+MAX_GRID_RATIO  5.0
+MAX_SLOPE       0.9
+MAX_CURVE       0.9
+PRUNE           0.0
+
+// Restart
+RESTART         0
+
+// Initial guess
+INITGUESS_FROMFILE 0
+
+// Solve Annular channel flows
+SOLVE_CHANNEL   1
+CHANNELRAD_ANNULUS 5e-3
+CHANNEL_VEL     0.01
