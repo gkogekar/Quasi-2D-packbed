@@ -44,7 +44,7 @@ Q2D model can be run using the pre-existing executables or by compiling the code
 ## Citation
 Please cite this package along with the research articles, when used in a scholarly work.
 1. `Computationally efficient and robust models of non-ideal thermodynamics, gas-phase kinetics and heterogeneous catalysis in chemical reactors', G. Kogekar, Doctoral dissertation, 2021
-2. `Quasi-two-dimensional model of catalytic packed-bed membrane reactors', G. Kogekar, H. Zhu, R.J. Kee, In preparation, 2023
+2. `Quasi-two-dimensional model of catalytic packed-bed membrane reactors', G. Kogekar, H. Zhu, F. Goldsmith, R.J. Kee, In preparation, 2025
 
 ## License
 Q2D packed-bed model is released under the MIT license; see LICENSE for details.
