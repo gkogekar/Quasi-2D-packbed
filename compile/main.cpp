@@ -29,37 +29,34 @@ int main()
     int refine = ip_ptr->m_refine;
     
     // Create BVP_instance instance
-    bvpQ2D BVP_instance(filename, ip_ptr, nv, points, L, energyFlag);
-    static bvpQ2D *bvp_ptr = &BVP_instance;
-
+    auto bvp_ptr = std::make_shared<bvpQ2D>(filename, ip_ptr, nv, points, L, energyFlag);
+    
     // Create user_func class
     user_func write_instance(bvp_ptr);
     static user_func *write_ptr = &write_instance;
-    //write_ptr->eval(0);
+    //write_ptr->write_eval(0);
     	
 	// Solve function
     try {
         // Solve the equations, refining the grid as needed        
-        cout<<"\n number of components = " << BVP_instance.nComponents();
-        BVP_instance.setSteadyTolerances(RTOL_Steady, ATOL_Steady, -1);
-        BVP_instance.setTransientTolerances(RTOL_Transient, ATOL_Transient, -1);
-        BVP_instance.solve(loglevel, write_ptr);
+        cout<<"\n number of components = " << bvp_ptr->nComponents();
+        bvp_ptr->setSteadyTolerances(RTOL_Steady, ATOL_Steady, -1);
+        bvp_ptr->setTransientTolerances(RTOL_Transient, ATOL_Transient, -1);
+        bvp_ptr->solve(loglevel, write_ptr);
         
         // Write the solution to a CSV file.
-        BVP_instance.writeStats();
-        BVP_instance.writeCSV(0);
-        BVP_instance.writeCSVMole(0);
-        //BVP_instance.writeConversion();
+        bvp_ptr->writeCSV(0);
+        bvp_ptr->writeCSVMole(0);
+        bvp_ptr->writeConversion();
         cout<<"\n Steady state is reached. Program exits successfully."<<endl;
         return 0;
     } catch (Cantera::CanteraError& err) {
         std::cerr << err.what() << std::endl;
         // Restore the last successful solution
-        BVP_instance.restoreSteadySolution();
-        //BVP_instance.restoreTimeSteppingSolution();
-        BVP_instance.writeStats();
-        BVP_instance.writeCSV(-1);
-        BVP_instance.writeCSVMole(-1);
+        bvp_ptr->restoreSteadySolution();
+        //bvp_ptr->restoreTimeSteppingSolution();
+        bvp_ptr->writeCSV(-1);
+        bvp_ptr->writeCSVMole(-1);
         cout<<"\n Error"<<endl;
         return -1;
     }
@@ -67,5 +64,5 @@ int main()
 
 void PrintInfo(void)
 {
-    cout<<"\nThis code simulates a steady, one dimensional boundary-value problem across a catalyst support \n \n";
+    cout<<"\nThis code simulates a steady, quasi-2D boundary-value problem across a catalytic membrane reactor \n \n";
 };

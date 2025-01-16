@@ -32,9 +32,9 @@ MICROPOROSITY_SUPPORT   0.4                  // Porosity of micro-pores [] (Supp
 MICROPORERAD_SUPPORT    1e-4                 // Radiaus of miccro-pores [m] (Support)
 
 //Filename
-GASCTIFILE_SUPPORT 	    Ammonia-Ni-BaZrO3.yaml	// Name of the CTI file containing gas phase (Support)
+GASCTIFILE_SUPPORT 	    methaneReformingNi.yaml	// Name of the CTI file containing gas phase (Support)
 GASPHASE_SUPPORT		gas				        // Name of the gas phase in CTI file (Support)
-SURFCTIFILE_SUPPORT 	Ammonia-Ni-BaZrO3.yaml	// Name of the CTI file containing surface phase (Support)
+SURFCTIFILE_SUPPORT 	methaneReformingNi.yaml	// Name of the CTI file containing surface phase (Support)
 SURFPHASE_SUPPORT		Ni_surface		        // Name of the surface phase in CTI file (Support)
 
 //Inlet conditions

@@ -10,19 +10,15 @@ using namespace std;
 #include <memory>
 
 // Include Boost libraries
-#include <boost/config.hpp>
-#include <boost/assert.hpp>
-#include <boost/numeric/ublas/matrix.hpp> 
-#include <boost/numeric/ublas/lu.hpp> 
-#include <boost/numeric/ublas/vector.hpp>
-using namespace boost::numeric::ublas;
+#include <boost/algorithm/string/trim.hpp>
+#include <boost/algorithm/string/predicate.hpp>
+#include <boost/lexical_cast.hpp>
 
 // Include Cantera files
 #include <cantera/thermo.h>
 #include <cantera/kinetics.h>
 #include <cantera/transport.h>
 #include <cantera/transport/DustyGasTransport.h>
-#include <cantera/kinetics/GasKinetics.h>
 #include "cantera/thermo/SurfPhase.h"
 #include "cantera/kinetics/KineticsFactory.h"
 #include "cantera/kinetics/InterfaceKinetics.h"
@@ -75,12 +71,12 @@ public:
     int nParts = 1;
 
     // Cantera objects
-    ThermoPhase* m_gas[2] = {NULL, NULL};
-    SurfPhase* m_surf[2] = {NULL, NULL};
-    GasKinetics* m_kin[2] = {NULL, NULL};
-    InterfaceKinetics* m_kin_surf[2] = {NULL, NULL};
-    Transport* m_tran[2] = {NULL, NULL};
-    DustyGasTransport* m_tranDGM[2] = {NULL, NULL};
+    std::shared_ptr<Cantera::ThermoPhase> m_gas[2] = {NULL, NULL};
+    std::shared_ptr<Cantera::SurfPhase> m_surf[2] = {NULL, NULL};
+    std::shared_ptr<Cantera::Kinetics> m_kin[2] = {NULL, NULL};
+    std::shared_ptr<Cantera::InterfaceKinetics> m_kin_surf[2] = {NULL, NULL};
+    std::shared_ptr<Cantera::Transport> m_tran[2] = {NULL, NULL};
+    std::shared_ptr<Cantera::DustyGasTransport> m_tranDGM[2] = {NULL, NULL};
 
     // Add flag for input mass or mole fraction
     int is_moleFrac = -1;                   // 0 for mole fractions, 1 for mass fractions

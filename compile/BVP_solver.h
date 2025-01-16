@@ -7,6 +7,7 @@
 
 #include <cantera/oneD/Domain1D.h>
 #include <cantera/base/Array.h>
+#include <cantera/base/AnyMap.h>
 #include <cantera/thermo/IdealGasPhase.h>
 #include <cantera/thermo/SurfPhase.h>
 #include <cantera/kinetics/InterfaceKinetics.h>
@@ -14,6 +15,8 @@
 #include <cantera/transport/DustyGasTransport.h>
 #include <cantera/transport.h>
 #include <cantera/numerics/Func1.h>
+#include "cantera/base/stringUtils.h"
+#include "cantera/base/SolutionArray.h"
 
 class Cantera::Transport;
 using namespace Cantera;
@@ -36,7 +39,6 @@ public:
 
     // Constructor and destructor functions
 	bvpQ2D(std::string filename, inputClass *ptr, int nv, int points, double Length, int energyFlag);
-	//virtual ~bvpQ2D();
 
     virtual void setupGrid(size_t n, const doublereal* z);
     void setupRadialGrid();
@@ -87,10 +89,14 @@ public:
                 m_press(j,i) = m_thermo->pressure();
                 m_cp(j,i) = m_thermo->cp_mass();
                 vector_double xmole(m_nsp, 0.0);
+                vector_double xmass(m_nsp, 0.0);
                 m_thermo->getMoleFractions(&xmole[0]);
+                m_thermo->getMassFractions(&xmass[0]);
+                double sum = 0,sum1 = 0;
                 for(int k = 0; k< m_nsp; k ++)
                 {
                     m_xMole(k, cellIndex(j,i)) = xmole[k];
+                    m_xMass(k, cellIndex(j,i)) = xmass[k];
                 }
             }
         }
@@ -108,10 +114,13 @@ public:
                     m_press(j,i) = m_thermo_2->pressure();
                     m_cp(j,i) = m_thermo_2->cp_mass();
                     vector_double xmole(m_nsp_2, 0.0);
+                    vector_double xmass(m_nsp_2, 0.0);
                     m_thermo_2->getMoleFractions(&xmole[0]);
+                    m_thermo_2->getMassFractions(&xmass[0]);
                     for(int k = 0; k< m_nsp_2; k++)
                     {
                         m_xMole(k, cellIndex(j,i)) = xmole[k];
+                        m_xMass(k, cellIndex(j,i)) = xmass[k];
                     }
                 }
             }
@@ -125,9 +134,6 @@ public:
                 setChannelState(x,j,i);
                 m_rho(j,i) = m_thermo->density();
                 m_press(j,i) = m_thermo->pressure();
-                //m_cp(j,i) = m_thermo->cp_mass();
-                //m_visc(j,i) = m_trans->viscosity();
-                //m_tcon(j,i) = m_trans->thermalConductivity();
             }
         }
     }
@@ -155,8 +161,10 @@ public:
     void writeConversion();
 
     // Read restart file
-    XML_Node& save(XML_Node& o, const doublereal* const sol);
-    void restore(const XML_Node& dom, double* soln, int loglevel);
+    void restoreSolution(double* x);
+
+    // Save solution
+    void saveSolution();
 
     // Inital guess from the diffusion-free steady solution
     void interpolate(double* x);
@@ -426,9 +434,9 @@ public:
     void KozenyCarmanPermeability(int);
 
     // Get coverages of point j
-    vector_fp getCov(int j)
+    vector_double getCov(int j)
     {
-        vector_fp cov(m_nspSurf, 0.0);
+        vector_double cov(m_nspSurf, 0.0);
         for(int i = 0; i<m_nspSurf; i++)
         {
             cov[i] = m_cov(i,j);
@@ -437,7 +445,7 @@ public:
     }
 
     // Set coverages of point j
-    void setCov(vector_fp cov, int j)
+    void setCov(vector_double cov, int j)
     {
         for(int i = 0; i<m_nspSurf; i++)
         {
@@ -473,7 +481,6 @@ public:
     virtual void solveEnergyatInlet(double* x, double* rsd, int* diag, double rdt, double memflux, size_t i);
     virtual void solveEnergyatOutlet(double* x, double* rsd, int* diag, double rdt, double memflux, size_t i);
 
-    virtual void showSolution(const doublereal* x);
     virtual void resetBadValues(double* xg);
     //virtual void updateCoverages(double* xg);
 
@@ -482,7 +489,7 @@ public:
      * @param loglevel controls amount of diagnostic output.
      */
     void solve(int loglevel=0, Func1* f = nullptr) {
-        if (m_sim == 0) {
+        if (!m_sim) {
             start();
         }
         bool refine = m_refineGrid!= 0;
@@ -493,13 +500,9 @@ public:
         m_sim->setMaxTimeStep(m_maxTimeStepSize);
         m_sim->setMinTimeStep(m_minTimeStepSize);
         m_sim->setRefineCriteria(1, m_max_grid_ratio, m_max_delta, m_max_delta_slope, m_prune);
-        if(m_restart)
-        {
-            m_sim->restore("savedSoln.xml", {}, loglevel);
-        }
         m_sim->setSteadyCallback(f);
         m_sim->solve(loglevel, refine);
-        m_sim->save("savedSoln.xml", {}, {}, loglevel);
+        saveSolution();
     }
 
     void restoreTimeSteppingSolution()
@@ -576,7 +579,7 @@ public:
                 ind = m_NeqTotal - nEq_channel;
                 for (m = 0; m < nEq_channel; m++) 
                 {
-                    f << componentName(ind + m) << "_ch";
+                    f << componentName(ind + m);
                     f << ", ";
                 }
             }
@@ -588,12 +591,40 @@ public:
             {
                 f << m_press(n,i) << ", ";
             }
-            for (m = 0; m < nc; m++) {
-                f << m_sim->value(1, m, n);
-                if (m != nc - 1) {
+            for(int i = 0; i < m_radialPoints; i++)
+            {
+                int ind;
+                if(i < m_lumenPoints)
+                {
+                    ind = i* nEq_lumen;
+                } else {
+                    ind = nv_lumen + (i - m_lumenPoints) * nEq_support;
+                }
+                
+                for (m = 0; m < c_offset_Y[0]; m++)
+                {
+                    f << m_sim->value(1, m + ind, n) << ", ";
+                }
+                for (m = 0; m < m_nsp; m++) {
+                    f << m_xMass(m,cellIndex(n,i));
                     f << ", ";
+                    //f << std::endl;
+                }    
+                for (m = c_offset_theta[0]; m < nEq_lumen; m++) {
+                    f << m_sim->value(1, m + ind, n);
+                    f << ", ";
+                    //f << std::endl;
                 }
             }
+            if(m_do_channel)
+            {
+                int ind = m_NeqTotal - nEq_channel;
+                for (m = 0; m < nEq_channel; m++) 
+                {
+                    f << m_sim->value(1, m + ind, n);
+                    f << ", ";
+                }
+            } 
             f << std::endl;
         }
     }
@@ -827,27 +858,27 @@ protected:
     int nv_lumen = 0;
 
     // grid parameters
-    vector_fp m_dz, m_zWall;
-    vector_fp m_r, m_rWall;
+    vector_double m_dz, m_zWall;
+    vector_double m_r, m_rWall;
 
     size_t m_nsp = 0;
     size_t m_nspSurf = 0;
     size_t m_nv = 0;
     int m_do_energy = 0;
 
-    IdealGasPhase* m_thermo;
-    GasKinetics* m_kin;
-    Transport* m_trans;
-    InterfaceKinetics* m_surfkin;
-	SurfPhase* m_surf;
-    DustyGasTransport* m_tranDGM;
+    std::shared_ptr<Cantera::IdealGasPhase> m_thermo;
+    std::shared_ptr<Cantera::Kinetics> m_kin;
+    std::shared_ptr<Cantera::Transport> m_trans;
+    std::shared_ptr<Cantera::InterfaceKinetics> m_surfkin;
+	std::shared_ptr<Cantera::SurfPhase> m_surf;
+    std::shared_ptr<Cantera::DustyGasTransport> m_tranDGM;
 
     // Support
-    IdealGasPhase* m_thermo_2;
-    GasKinetics* m_kin_2;
-    Transport* m_trans_2;
-    InterfaceKinetics* m_surfkin_2;
-	SurfPhase* m_surf_2;
+    std::shared_ptr<Cantera::IdealGasPhase> m_thermo_2;
+    std::shared_ptr<Cantera::Kinetics> m_kin_2;
+    std::shared_ptr<Cantera::Transport> m_trans_2;
+    std::shared_ptr<Cantera::InterfaceKinetics> m_surfkin_2;
+	std::shared_ptr<Cantera::SurfPhase> m_surf_2;
 
     size_t m_nsp_2 = 0;
     size_t m_nspSurf_2 = 0;
@@ -862,27 +893,28 @@ protected:
     Array2D m_press;
     Array2D p_prev;
     Array2D rho_prev;
-    vector_fp rho_prev_2;
+    vector_double rho_prev_2;
 
     // species thermo properties
-    vector_fp m_wt;
-    vector_fp m_wt_2;
+    vector_double m_wt;
+    vector_double m_wt_2;
     Array2D m_cp;
 
     //Surface site-density
     vector_double m_gamma;
 
     // transport properties
-    vector_fp m_diff;
-    vector_fp m_diff_radial;
+    vector_double m_diff;
+    vector_double m_diff_radial;
     Array2D m_visc;
     Array2D m_tcon;
-    vector_fp m_multidiff;
-    vector_fp m_multidiff_radial;
+    vector_double m_multidiff;
+    vector_double m_multidiff_radial;
     Array2D m_dthermal;
     Array2D m_flux;
     Array2D m_interfaceFlux;
     Array2D m_xMole;
+    Array2D m_xMass;
     vector_double radialFluxTerm;
 
     // production rates
@@ -907,7 +939,7 @@ protected:
     //! Index of gas and surface phase species with a large mass fraction at each boundary, for which
     //! the mass fraction may be calculated as 1 minus the sum of the other mass
     //! fractions
-    vector_fp m_kExcess;
+    vector_double m_kExcess;
     size_t m_kExcessLeft;
     size_t m_kExcessRight;
     //size_t m_surfExcessLeft;
@@ -928,8 +960,8 @@ protected:
     //Inlet values
     double rho_fixed, T_in, T_wall, p_out, m_inletVel, m_inletMassFlux;
     double m_hcoeff;
-    vector_fp m_yInlet, m_xInlet;
-    vector_fp m_thetaInlet;
+    vector_double m_yInlet, m_xInlet;
+    vector_double m_thetaInlet;
     double m_conversion;
 
     //Multi/Mix transport
@@ -958,7 +990,7 @@ protected:
 	vector_double state_curr = {};
 
     private:
-    vector_fp m_ybar;
+    vector_double m_ybar;
     double const m_FICK = 0;
     double const m_DGM = 1;
 
@@ -975,10 +1007,9 @@ class user_func : public Cantera::Func1
 {
 public:
     friend class bvpQ2D;
-    user_func(bvpQ2D* ptr)
+    user_func(std::shared_ptr<bvpQ2D> ptr)
     {
         Func1();
-        //cout<<"\n refinegrid == "<< ptr->m_refineGrid;
         main_ptr = ptr;
         //m_func = &write_instance;
     }
@@ -992,5 +1023,5 @@ public:
     }
 
     //protected:
-    bvpQ2D* main_ptr;  
+    std::shared_ptr<bvpQ2D> main_ptr;  
 };

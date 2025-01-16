@@ -63,7 +63,7 @@ REFINE          1
 
 //Axial transport
 TRAN_MODEL      FICK                     // Transport using either Fickian diffusion (Default)
-MESHPOINTS      30                       // Number of axial mesh points
+MESHPOINTS      10                       // Number of axial mesh points
 RAND_PORE_MODEL 1                        // Include random-pore model
 
 //Radial transport
@@ -96,7 +96,7 @@ LOGLEVEL        1                       // Loglevel
 MAXGRIDPOINTS   1000                    // Maximum allowed grid points
 MAXTIMESTEPS    500                     // Maximum number of time-steps allowed before successful steady-state solve
 MINTIMESTEPS    10                      // Minimum number of time-steps allowed before successful steady-state solve
-MINTIMESTEPSIZE 1e-05                   // Minimum time-step size
+MINTIMESTEPSIZE 1e-5                   // Minimum time-step size
 MAXTIMESTEPSIZE 1e08                    // Maximum time-step size
 
 //Grid Refining
@@ -109,10 +109,10 @@ PRUNE           0.0
 RESTART         0
 
 // Initial guess
-INITGUESS_FROMFILE  1
+INITGUESS_FROMFILE  0
 INITGUESS_FILENAME  initGuess.csv       // Filename to read initial guess from
 
 // Solve Annular channel flows
-SOLVE_CHANNEL   1                      // Include annular channel [0/1]
+SOLVE_CHANNEL   0                      // Include annular channel [0/1]
 CHANNELRAD_ANNULUS 5e-3                // Outer radiaus of the annular channel
 CHANNEL_VEL     0.01                   // Velocity inside the annular channel

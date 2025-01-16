@@ -1,6 +1,4 @@
 #include "BVP_solver.h"
-#include "cantera/base/ctml.h"
-#include "cantera/transport/TransportBase.h"
 
 using namespace std;
 using namespace Cantera;
@@ -106,7 +104,7 @@ bvpQ2D::bvpQ2D(std::string filename, inputClass *ip_ptr, int nv, int points, dou
     m_prune = ip_ptr->prune;
     
     // Cantera Phases
-    m_thermo = dynamic_cast<IdealGasPhase*> (ip_ptr->m_gas[0]);
+    m_thermo = std::dynamic_pointer_cast<IdealGasPhase> (ip_ptr->m_gas[0]);
     m_kin = (ip_ptr->m_kin[0]);
     m_trans = ip_ptr->m_tran[0];
     m_surfkin = ip_ptr->m_kin_surf[0];
@@ -165,7 +163,7 @@ bvpQ2D::bvpQ2D(std::string filename, inputClass *ip_ptr, int nv, int points, dou
         m_thickness_2 = ip_ptr->m_thickness_2;
 
         // Cantera Phases
-        m_thermo_2 = dynamic_cast<IdealGasPhase*> (ip_ptr->m_gas[1]);
+        m_thermo_2 = std::dynamic_pointer_cast<IdealGasPhase> (ip_ptr->m_gas[1]);
         m_kin_2 = ip_ptr->m_kin[1];
         m_trans_2 = ip_ptr->m_tran[1];
         m_surfkin_2 = ip_ptr->m_kin_surf[1];
@@ -193,7 +191,7 @@ bvpQ2D::bvpQ2D(std::string filename, inputClass *ip_ptr, int nv, int points, dou
     m_inletMassFlux = ip_ptr->m_inletFlux;
 
     // Set transport
-    m_do_multicomponent = (m_trans->transportType() == "Multi");
+    m_do_multicomponent = (m_trans->transportModel() == "Multi");
     m_multidiff.resize(m_nsp*m_nsp*m_points, 0.0);
     
     // Calculate permeability
@@ -240,7 +238,7 @@ bvpQ2D::bvpQ2D(std::string filename, inputClass *ip_ptr, int nv, int points, dou
             int ind = nv_lumen + (i - m_lumenPoints) * nEq_support;
         
             //-------------- default solution bounds --------------------
-            setBounds(c_offset_U[1] + ind, -1e-20, 1e20); // Density
+            setBounds(c_offset_U[1] + ind, -1e-20, 1e20); // Velocity
             setBounds(c_offset_T[1] + ind, 200.0, 2*m_thermo_2->maxTemp()); // temperature bounds
             setBounds(c_offset_Ts[1] + ind, 200.0, 2*m_thermo_2->maxTemp()); // temperature bounds
             m_refiner->setActive(c_offset_T[1] + ind, true);
@@ -270,14 +268,28 @@ bvpQ2D::bvpQ2D(std::string filename, inputClass *ip_ptr, int nv, int points, dou
     }
 
     vector_double gr;
-    for (size_t ng = 0; ng < m_axialPoints; ng++) {
+    
+    if(m_initGuess)
+    {
+        readCSV(m_initGuessFile);
+        // Get the length of the z vector from the initial data
+        nSteady = m_initData.at(0).second.size(); // m_initData[0].size();  
+        cout<<"\n Number of grid points in the initial guess = "<<nSteady;
+        for(int ind = 0; ind < nSteady; ind++)
+        {
+            gr.push_back(m_initData.at(0).second.at(ind));
+        }
+        m_axialPoints = nSteady;
+    } else {
+        for (size_t ng = 0; ng < m_axialPoints; ng++)
+        {
         gr.push_back(L*ng/(m_axialPoints-1));
+        }
     }
     setupGrid(m_axialPoints, gr.data());
     setupRadialGrid();
     m_gamma[0] = m_surf->siteDensity();
-    //cout<<"\n gamma = "<< m_surfkin->nReactions();
-
+    
     // make a local copy of the species molecular weight vector
     m_wt.resize(m_nsp, 0.0);
     m_wt = m_thermo->molecularWeights();
@@ -314,7 +326,7 @@ void bvpQ2D::setupGrid(size_t n, const doublereal* z)
 }
 
 /* 
-    Resize all vectorsand arrays after the mesh refinement
+    Resize all vectors and arrays after the mesh refinement
 */
 void bvpQ2D::resize(size_t ncomponents, size_t points)
 {
@@ -333,6 +345,7 @@ void bvpQ2D::resize(size_t ncomponents, size_t points)
     m_wdot.resize(m_nsp,m_points, 0.0);
     m_sdot.resize(m_nsp + m_nspSurf,m_points, 0.0);
     m_xMole.resize(m_nsp, m_points, 0.0);
+    m_xMass.resize(m_nsp, m_points, 0.0);
     
     m_diff.resize(m_nsp*m_points, 0.0);
     m_diff_radial.resize(m_nsp*m_points, 0.0);
@@ -808,8 +821,7 @@ void bvpQ2D::eval(size_t jg, doublereal* xg,
             evalResidual(x, rsd, diag, rdt, jmin, jmax, i);
         }
     }
-    //getNH3Conversion(x);
-    //showSolution(x);
+    getNH3Conversion(x);
 } 
 
 /* 
@@ -1320,22 +1332,21 @@ double bvpQ2D::getMembraneFlux(double* x, size_t j)
 */
 void bvpQ2D::_getInitialSoln(double* x)
 {
-    if(!m_restart)
+    if(!m_restart && !m_initGuess)
     {
         for (size_t j = 0; j < m_axialPoints; j++) {
             for (size_t i = 0; i < m_lumenPoints; i++)
             {
                 vector_double cov(m_nspSurf, 0.0);
                 int ind = i*nEq_lumen;
-                // Set velocity
+                
                 x[index(c_offset_U[0] + ind, j)] = m_inletVel;
-
-                //Set mass fractions, Temperature and pressure
+                // Set mass fractions, Temperature and pressure
                 m_thermo->setMassFractions(m_yInlet.data());
                 m_thermo->setState_TP(T_in, p_out);
-                
-                //Surface
                 m_surf->setTemperature(T_in);
+
+                //Surface
                 m_surf->setCoveragesNoNorm(m_thetaInlet.data());
                 m_surfkin->solvePseudoSteadyStateProblem(1,1);
                 m_surf->getCoverages(cov.data());
@@ -1381,11 +1392,33 @@ void bvpQ2D::_getInitialSoln(double* x)
                 x[index(c_offset_ch_rho + ind, j)] = rho0_ch;
             }
         }
-    }
-    if(m_initGuess)
+    } else if(m_initGuess)
     {
-        readCSV(m_initGuessFile);
-        interpolate(x);
+        int jVar = m_initData.size();
+        int jInd;
+        std::string name = {};
+        for(int i = 0; i < m_axialPoints; i++)
+        {
+            for(int j = 1; j < jVar; j++)
+            {
+                name = m_initData.at(j).first;
+                jInd = componentIndex(name);
+                x[index(jInd, i)] = m_initData.at(j).second.at(i);
+            }
+            
+            // Assign the same values along the radial direction
+            for (size_t j = 0; j < m_lumenPoints; j++)
+            {
+                for(int k = 0; k < nEq_lumen; k++)
+                {
+                    x[index(j*nEq_lumen + k, i)] = x[index(k, i)];
+                }
+                x[index(j*nEq_lumen + c_offset_Ts[0], i)] = x[index(c_offset_T[0], i)];
+            }
+        }
+    } else if (m_restart)
+    {
+        restoreSolution(x);
     }
 }
 
@@ -1397,6 +1430,7 @@ string bvpQ2D::componentName(size_t m) const
     if(m < nv_lumen)        // Points inside the Lumen
     {
         size_t n = (m % nEq_lumen);
+        int i = m/nEq_lumen;
         switch (n) {
         case 0:
             return ("Velocity");
@@ -1457,12 +1491,19 @@ string bvpQ2D::componentName(size_t m) const
 */
 size_t bvpQ2D::componentIndex(const std::string& name) const
 {
+    size_t n_ch = (m_NeqTotal - nEq_channel);
     if (name=="Velocity") {
         return 0;
     } else if (name=="GasTemperature") {
         return 1;
     } else if (name=="SolidTemperature") {
         return 2;
+    } else if (name=="Annular_Density") {
+        return (n_ch + 0);
+    } else if (name=="Annular_Velocity") {
+        return (n_ch + 1);
+    } else if (name=="Annular_Temperature") {
+        return (n_ch + 2);
     } else {
         for (size_t n=c_offset_Y[0]; n<(m_nsp+c_offset_Y[0]); n++) {
             std::string name1 = componentName(n);
@@ -1481,14 +1522,6 @@ size_t bvpQ2D::componentIndex(const std::string& name) const
         throw CanteraError("bvpQ2D::componentIndex",
                            "no component named " + name);
     }
-}
-
-/* 
-    Function to print current solution
-*/
-void bvpQ2D::showSolution(const doublereal* x)
-{
-    Domain1D::showSolution(x);
 }
 
 /* 
@@ -2415,177 +2448,147 @@ void bvpQ2D::getkExcess(const double* x)
     }
 }
 
-XML_Node& bvpQ2D::save(XML_Node& o, const doublereal* const sol)
+void bvpQ2D::saveSolution()
 {
-    Array2D soln(m_nv, m_axialPoints, sol + loc());
-    XML_Node& flow = Domain1D::save(o, sol);
-    
-    for(size_t iGrid =0; iGrid<m_totRadialPoints; iGrid++)
-    {
-        int ind, nsp, nsps, part;
-        if(iGrid < m_lumenPoints)
+    std::string filename = "savedSolution.csv";
+    std::ofstream f(filename);
+    int np = nPoints();
+    int nc = nComponents();
+    int n, m, ind, neq;
+    bool dotitles = true;
+    if (dotitles) {
+        f << "z" << ", ";
+        for(int i = 0; i < m_radialPoints; i++)
         {
-            ind = iGrid*nEq_lumen;
-            nsp = m_nsp;
-            nsps = m_nspSurf;
-            part = 0;
-        } else {
-            ind = nv_lumen + (iGrid - m_lumenPoints) * nEq_support;
-            nsp = m_nsp_2;
-            nsps = m_nspSurf_2;
-            part = 1;
-        }
-    
-        doublereal *pres = new doublereal[m_axialPoints];
-        for (int k = 0; k < m_axialPoints; k++)
-        {
-            pres[k] = m_press(iGrid, k);
-        }
-
-        XML_Node& gv = flow.addChild("grid_data");
-        addFloat(flow, "pressure", *pres, "Pa", "pressure");
-
-        addFloatArray(gv,"z",m_z.size(), m_z.data(), "m","length");
-        vector_double x(soln.nColumns());
-        soln.getRow(c_offset_U[part] + ind, x.data());
-        addFloatArray(gv,"u",x.size(),x.data(),"m/s","velocity");
-
-        if(m_solveRadialVel)
-        {
-            soln.getRow(c_offset_V[part], x.data());
-            addFloatArray(gv,"V",x.size(),x.data(),"m/s","radialVel");
-        }
-
-        soln.getRow(c_offset_T[part], x.data());
-        addFloatArray(gv,"T",x.size(),x.data(),"K","gas temperature");
-
-        soln.getRow(c_offset_Ts[part], x.data());
-        addFloatArray(gv,"Ts",x.size(),x.data(),"K","surf temperature");
-
-        for (size_t k = 0; k < nsp; k++) {
-            soln.getRow(c_offset_Y[part]+k, x.data());
-            if(part == 0) {
-                addFloatArray(gv,m_thermo->speciesName(k), x.size(),x.data(),"","massFraction");
+            if(i < m_lumenPoints)
+            {
+                ind = i* nEq_lumen;
+                neq = nEq_lumen;
             } else {
-                addFloatArray(gv,m_thermo_2->speciesName(k), x.size(),x.data(),"","massFraction");
+                neq = nEq_support;
+                ind = nv_lumen + (i - m_lumenPoints) * nEq_support;
+            }
+            for (m = 0; m < neq; m++)
+            {
+                f << componentName(ind+m) << "_"<<i;
+                f << ", ";
             }
         }
-        for (size_t k = 0; k < nsps; k++) {
-            soln.getRow(c_offset_theta[part]+k, x.data());
-            if(part == 0) {
-                addFloatArray(gv,m_surf->speciesName(k), x.size(),x.data(),"","surfCoverages");
-            } else {
-                addFloatArray(gv,m_surf_2->speciesName(k), x.size(),x.data(),"","surfCoverages");
+        if(m_do_channel)
+        {
+            ind = m_NeqTotal - nEq_channel;
+            for (m = 0; m < nEq_channel; m++) 
+            {
+                f << componentName(ind + m);
+                f << ", ";
             }
         }
+        f << std::endl;
     }
-
-    XML_Node& ref = flow.addChild("refine_criteria");
-    addFloat(ref, "ratio", refiner().maxRatio());
-    addFloat(ref, "slope", refiner().maxDelta());
-    addFloat(ref, "curve", refiner().maxSlope());
-    addFloat(ref, "prune", refiner().prune());
-    addFloat(ref, "grid_min", refiner().gridMin());
-    return flow;
+    for (n = 0; n < np; n++) {
+        f << z(n) << ", " ;
+        for(int i = 0; i < m_radialPoints; i++)
+        {
+            int ind;
+            if(i < m_lumenPoints)
+            {
+                ind = i* nEq_lumen;
+            } else {
+                ind = nv_lumen + (i - m_lumenPoints) * nEq_support;
+            }
+                
+            for (m = 0; m < c_offset_Y[0]; m++)
+            {
+                f << m_sim->value(1, m + ind, n) << ", ";
+            }
+            for (m = 0; m < m_nsp; m++) {
+                f << m_xMass(m,cellIndex(n,i));
+                f << ", ";
+                //f << std::endl;
+            }    
+            for (m = c_offset_theta[0]; m < nEq_lumen; m++) {
+                f << m_sim->value(1, m + ind, n);
+                f << ", ";
+                //f << std::endl;
+            }
+        }
+        if(m_do_channel)
+        {
+            int ind = m_NeqTotal - nEq_channel;
+            for (m = 0; m < nEq_channel; m++) 
+            {
+                f << m_sim->value(1, m + ind, n);
+                f << ", ";
+            }
+        } 
+        f << std::endl;
+    }
 }
 
-void bvpQ2D::restore(const XML_Node& dom, doublereal* soln, int loglevel)
+void bvpQ2D::restoreSolution(double* x)
 {
-    int ind, iGrid;
-    cout<<"\n Reading the saved solution...";
-    Domain1D::restore(dom, soln, loglevel);
-
-    std::vector<XML_Node*> str = dom.getChildren("string");
-    for (size_t istr = 0; istr < str.size(); istr++) {
-        const XML_Node& nd = *str[istr];
-        writelog(nd["title"]+": "+nd.value()+"\n");
+    readCSV("savedSolution.csv");
+    // Get the length of the z vector from the initial data
+    int nRestore = m_initData.at(0).second.size();
+    cout<<"\n Number of grid points in the saved solution = "<<nRestore;
+    // Form grid
+    vector_double gr;
+    for(int ind = 0; ind < nRestore; ind++)
+    {
+        gr.push_back(m_initData.at(0).second.at(ind));
     }
+    m_axialPoints = nRestore;
+    setupGrid(m_axialPoints, gr.data());
+    setupRadialGrid();
 
-    double pp = getFloat(dom, "pressure", "pressure");
-    //setPressure(pp);
-    std::vector<XML_Node*> d = dom.child("grid_data").getChildren("floatArray");
-    vector_double x;
-    size_t np = 0;
-    for (size_t n = 0; n < d.size(); n++) {
-        const XML_Node& fa = *d[n];
-        string nm = fa["title"];
-        if (nm == "z") {
-            getFloatArray(fa,x,false);
-            np = x.size();
-            if (loglevel >= 2) {
-                writelog("Grid contains {} points.\n", np);
-            }
-            setupGrid(np, x.data());
-        }
+    // Read solution data
+    int jVar = m_initData.size() - 2; // First column is z and last column is empty 
+    if(m_do_channel)
+    {
+        jVar = m_initData.size() - 1;
     }
-    for (size_t n = 0; n < d.size(); n++) {
-        const XML_Node& fa = *d[n];
-        string nm = fa["title"];
-        getFloatArray(fa,x,false);
-        if (nm == "u") {
-            debuglog("axial velocity   ", loglevel >= 2);
-            if (x.size() != np) {
-                throw CanteraError("bvpQ2D::restore",
-                                   "axial velocity array size error");
-            }
-            for (size_t j = 0; j < np; j++) {
-                soln[index(c_offset_U[0],j)] = x[j];
-            }
-        } else if (nm == "z") {
-            ; // already read grid
-        } else if (nm == "V" && m_solveRadialVel) {
-            debuglog("radial velocity   ", loglevel >= 2);
-            if (x.size() != np) {
-                throw CanteraError("bvpQ2D::restore",
-                                   "radial velocity array size error");
-            }
-            for (size_t j = 0; j < np; j++) {
-                soln[index(c_offset_V[0],j)] = x[j];
-            }
-        } else if (nm == "T") {
-            debuglog("gas temperature   ", loglevel >= 2);
-            if (x.size() != np) {
-                throw CanteraError("bvpQ2D::restore",
-                                   "temperature array size error");
-            }
-            for (size_t j = 0; j < np; j++) {
-                soln[index(c_offset_T[0],j)] = x[j];
-            }
-        } else if (nm == "Ts") {
-            debuglog("surf temperature   ", loglevel >= 2);
-            if (x.size() != np) {
-                throw CanteraError("bvpQ2D::restore",
-                                   "temperature array size error");
-            }
-            for (size_t j = 0; j < np; j++) {
-                soln[index(c_offset_Ts[0],j)] = x[j];
-            }
-        } else if (m_thermo->speciesIndex(nm) != npos) {
-            debuglog(nm+"   ", loglevel >= 2);
-            if (x.size() == np) {
-                size_t k = m_thermo->speciesIndex(nm);
-                for (size_t j = 0; j < np; j++) {
-                    soln[index(k+c_offset_Y[0],j)] = x[j];
+    if(jVar != m_NeqTotal)
+    {
+        throw CanteraError("restoreSolution", 
+                           "Total number of variables from the restore file are different than total number of variables in the model");
+    }
+    int jInd;
+    std::string name = {};
+    for(int i = 0; i < m_axialPoints; i++)
+    {
+        for(int j = 1; j < jVar; j++)
+        {
+            name = m_initData.at(j).first;
+            boost::trim_left(name);
+
+            // Find the position of the underscore
+            boost::iterator_range<std::string::iterator> pos = boost::algorithm::find_first(name, "_");
+            // Get the substring before and after the underscore
+            std::string after_pos = std::string(pos.end(), name.end());
+            std::string before_pos = std::string(name.begin(), pos.begin()); //std::string(0, pos);
+            //std::string before_pos = name.substr(0, pos);
+                
+            if(before_pos == "Annular")
+            {
+                // Annular channel
+                jInd = componentIndex(name);
+                if(m_do_channel)
+                {
+                    x[index(jInd, i)] = m_initData.at(j).second.at(i);
+                }
+            } else {
+                // Get index of the radial point
+                int rad_num = boost::lexical_cast<int>(after_pos);
+                
+                // Find component name
+                name = before_pos;
+                if(name != "")
+                {
+                    jInd = componentIndex(name);
+                    x[index(rad_num*nEq_lumen + jInd, i)] = m_initData.at(j).second.at(i);
                 }
             }
-        } else if (m_surf->speciesIndex(nm) != npos) {
-            debuglog(nm+"   ", loglevel >= 2);
-            if (x.size() == np) {
-                size_t k = m_surf->speciesIndex(nm);
-                for (size_t j = 0; j < np; j++) {
-                    soln[index(k+c_offset_theta[0],j)] = x[j];
-                }
-            }
-        } else {
-            // error
         }
-    }
-
-    if (dom.hasChild("refine_criteria")) {
-        XML_Node& ref = dom.child("refine_criteria");
-        refiner().setCriteria(getFloat(ref, "ratio"), getFloat(ref, "slope"),
-                              getFloat(ref, "curve"), getFloat(ref, "prune"));
-        refiner().setGridMin(getFloat(ref, "grid_min"));
     }
 }
 
@@ -2745,7 +2748,8 @@ void bvpQ2D::setChannelState(const doublereal* x, size_t j, size_t i)
     rho_ch = x[index(c_offset_ch_rho + ind, j)];
     vector_double xx(m_nsp, 0.0);
     xx[m_memSpeciesIndex] = 1.00;
-    m_thermo->setState_TRX(Temp_ch, rho_ch, xx.data());
+    m_thermo->setMoleFractions(xx.data());
+    m_thermo->setState_TD(Temp_ch, rho_ch);
 }
 
 double bvpQ2D::getFrictionFactor(double* x, int j, int i)

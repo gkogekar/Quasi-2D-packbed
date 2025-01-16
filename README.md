@@ -12,7 +12,7 @@ Q2D model can be run using the pre-existing executables or by compiling the code
 ## Compiling from the source code
 
 #### Installation requirements
-1. Compiled Cantera code (Works with Cantera 2.6)
+1. Compiled Cantera code (Works with Cantera 3.1)
 2. Python, Boost, and Sundials - The Q2D PackBed code does not use Python or Sundials explicitly, but Cantera needs this software.
 3. Microsoft Visual Studio (Required on Windows)
 
@@ -36,9 +36,9 @@ Q2D model can be run using the pre-existing executables or by compiling the code
    T, P, and V correspond to the inlet temperature, pressure, and velocity(or flow rate).
 4. The file 'solution_T_P_V.csv' stores the variables used in the solution vector 
    (i.e. mass fractions of gas-phase species, density, pressure, temperature, and surface coverages). 
-5. The XML file starting with "Err_" is saved in case of code failure. It saves the last successful steady-state solution.
+5. The CSV file starting with "Err_" is saved in case of code failure. It saves the last successful steady-state solution.
 6. The input file (input.dat) contains a parameter called 'RESTART' to specify if the user wants to use the previous solution as the initial guess. 
-7. If RESTART is set to 1, then the model reads the XML file named "savedSoln.xml" as the initial guess. The file "savedSoln" gets saved every time the model is run.
+7. If RESTART is set to 1, then the model reads the CSV file named "savedSolution.csv" as the initial guess. The file "savedSolution.csv" gets saved every time the model is run successfully.
 8. The files 'steadysolve_n_*.csv' store the solution before `n' th refinement. 
 
 ## Citation

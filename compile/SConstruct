@@ -1,11 +1,12 @@
-env = Environment(TARGET_ARCH='amd64', MSVC_VERSION='14.2')
+#env = Environment(TARGET_ARCH='amd64', MSVC_VERSION='14.3')
+env = Environment()
 
-env['CXX'] = '$CC'
-env.Append(CCFLAGS=['/MD', '/nologo', '/D_SCL_SECURE_NO_WARNINGS', '/D_CRT_SECURE_NO_WARNINGS', '/Zi', '/Fd${TARGET}.pdb', '/EHsc'],
-           CPPPATH=['C:\\cantera-2.6\\canteraBuild\\include', 'C:\\Gandhali\\research\\boost_1_70_0'],
-           LIBS=['cantera'],
-           LIBPATH=['C:\\cantera-2.6\\canteraBuild\\lib'],
-           RPATH=['C:\\cantera-2.6\\canteraBuild\\lib'],
+#env['CXX'] = '$CC'
+env.Append(CCFLAGS=['/std:c++17', '/MD', '/nologo', '/D_SCL_SECURE_NO_WARNINGS', '/D_CRT_SECURE_NO_WARNINGS', '/Zi', '/Fd${TARGET}.pdb', '/EHsc'],
+           CPPPATH=['C:\\cantera-3.1\\canteraBuild\\include', 'C:\\Gandhali\\research\\boost_1_83_0'],
+           LIBS=['cantera', 'cantera_shared'],
+           LIBPATH=['C:\\cantera-3.1\\canteraBuild\\lib'],
+           RPATH=['C:\\cantera-3.1\\canteraBuild\\lib'],
            LINKFLAGS=['/nologo', '/DEBUG', '/NODEFAULTLIB:MSVCRTD'],
            FRAMEWORKS=[])
 

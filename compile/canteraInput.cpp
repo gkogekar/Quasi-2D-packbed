@@ -319,8 +319,7 @@ void inputClass::updateEosType(int i)
         cout<<"\n Error: No gas phase mechanism file is specified. Program will exit now...\n";
         exit(-1);
     } 
-    //XML_Node* xgas = get_XML_File(m_filenameGas[i]);
-	
+    
     // Read Surface-Phase
     if(m_filenameSurf[i].empty())
     {
@@ -342,10 +341,9 @@ void inputClass::updateEosType(int i)
     cout<<"\nReading gas-phase mechanism file \t" << m_filenameGas[i] << endl;	
     if (boost::algorithm::ends_with(m_filenameGas[i], "yaml"))
     {
-        m_gas[i] = newPhase(m_filenameGas[i], m_gasPhase[i]);
-        auto kin = newKinetics({m_gas[i]}, m_filenameGas[i], m_gasPhase[i]);
-        m_kin[i] = dynamic_cast<GasKinetics*>(kin.release());
-        m_tran[i] = newDefaultTransportMgr(m_gas[i]);
+        m_gas[i] = newThermo(m_filenameGas[i], m_gasPhase[i]);
+        m_kin[i] = newKinetics({m_gas[i]}, m_filenameGas[i]);
+        m_tran[i] = newTransport(m_gas[i]);
     } else {
         cout<<"\n Error: Unsupported file format. Specify YAML file. Program will exit now... \n";
         exit(-1);
@@ -356,7 +354,7 @@ void inputClass::updateEosType(int i)
 
     if(m_tranModel ==1)
     {
-        m_tranDGM[i] = dynamic_cast<DustyGasTransport*>(m_tran[i]);
+        m_tranDGM[i] = std::dynamic_pointer_cast<DustyGasTransport>(m_tran[i]);
     }
 	//Surface phase (uses only ideal gas EoS)
     cout<<"\nReading surface-phase mechanism file \t" << m_filenameSurf[i] << endl;	
@@ -368,9 +366,9 @@ void inputClass::updateEosType(int i)
     if (boost::algorithm::ends_with(m_filenameSurf[i], "yaml"))
     {
         cout << "surface-phase name = "<< m_surfPhase[i] <<endl;
-        m_surf[i] = dynamic_cast<SurfPhase*> (newPhase(m_filenameSurf[i], m_surfPhase[i]));
-        auto kinSurf = newKinetics({m_surf[i], m_gas[i]},m_filenameSurf[i], m_surfPhase[i]);
-        m_kin_surf[i] = dynamic_cast<InterfaceKinetics*>(kinSurf.release());
+        m_surf[i] = std::dynamic_pointer_cast<SurfPhase> (newThermo(m_filenameSurf[i], m_surfPhase[i]));
+        auto kinSurf = newKinetics({m_surf[i], m_gas[i]},m_filenameSurf[i]);
+        m_kin_surf[i] = std::dynamic_pointer_cast<InterfaceKinetics>(kinSurf);
     } else {
         cout<<"\n Error: Unsupported file format. Specify YAML file. Program will exit now... \n";
         exit(-1);
@@ -380,9 +378,8 @@ void inputClass::updateEosType(int i)
 	cout << "Number of surface reactions = " << m_kin_surf[i]->nReactions() << endl;
 }
 
-/* Define variable pointers
-    U = 0, T = 1, Ygas = 2 to nsp+1
-	and theta = (nsp + 2) to (nsp + m_nspSurf + 2) 
+/* 
+    Define variable pointers
 */
 void inputClass::getVarPointers(int i)
 {
